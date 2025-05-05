@@ -1,0 +1,15 @@
+# Compiled or temporary artifacts
+*.pid
+*.tar
+*.gz
+*.zip
+
+# Database dumps and backups
+*.sql
+*.sql.gz
+*.bak
+
+# Environment files
+.env
+.env.*
+!.env.example

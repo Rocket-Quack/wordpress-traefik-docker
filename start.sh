@@ -1,14 +1,32 @@
 #!/bin/sh
 set -e
 
-# === Check and run init script ===
-if [ -x ./scripts/init-acme.sh ]; then
-  ./scripts/init-acme.sh
+echo "Starting Rocket-Quack Wortdpress Treafik setup..."
+
+TEMPLATE=".env.example"
+TARGET=".env"
+SETUP_ENV="./scripts/setup-env.sh"
+
+# First the .env.example is copied
+if [ ! -f "$TARGET" ]; then
+  echo "📄 Copying $TEMPLATE to $TARGET"
+  cp "$TEMPLATE" "$TARGET"
 else
-  echo "Init script is missing or not executable: ./scripts/init-acme.sh"
+  echo "$TARGET already exists – keeping it."
+fi
+
+# Creating .env with input values from console
+if [ -x "$SETUP_ENV" ]; then
+  echo "Running interactive setup..."
+  "$SETUP_ENV"
+else
+  echo "Error: $SETUP_ENV not found or not executable."
   exit 1
 fi
 
-# === Start docker stack ===
-echo "Starting Docker containers..."
+echo "Environment setup complete"
+echo "Preparing the engines to start docker"
+
+# Start docker stack
+echo "Docker liftoff..."
 docker compose up -d
