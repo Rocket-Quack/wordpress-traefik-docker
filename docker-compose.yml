@@ -1,0 +1,96 @@
+services:
+
+  wordpress:
+    image: wordpress:6.8.1-php8.2-apache
+    container_name: wordpress
+    restart: unless-stopped
+    environment:
+      WORDPRESS_DB_HOST: database
+      WORDPRESS_DB_NAME: ${DB_NAME}
+      WORDPRESS_DB_USER: ${DB_USER}
+      WORDPRESS_DB_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - ${VOLUME_BASE_PATH}/${WORDPRESS_CONTENT_PATH}:/var/www/html/wp-content
+    labels:
+      - "traefik.enable=true"
+
+      # Domain specification
+      - "traefik.http.routers.wordpress.rule=Host(`${DOMAIN_NAME}`) || Host(`www.${DOMAIN_NAME}`)"
+
+      # HTTPS
+      - "traefik.http.routers.wordpress.entrypoints=websecure"
+      - "traefik.http.routers.wordpress.tls.certresolver=letsencrypt"
+
+      # HTTP to HTTPS
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+      - "traefik.http.routers.wordpress.middlewares=redirect-to-https@docker"
+      - "traefik.http.routers.wordpress-http.rule=Host(`${DOMAIN_NAME}`) || Host(`www.${DOMAIN_NAME}`)"
+      - "traefik.http.routers.wordpress-http.entrypoints=web"
+
+      # HSTS Header
+      - "traefik.http.middlewares.hsts.headers.stsSeconds=31536000"
+      - "traefik.http.middlewares.hsts.headers.stsIncludeSubdomains=true"
+      - "traefik.http.middlewares.hsts.headers.stsPreload=true"
+      - "traefik.http.routers.wordpress.middlewares=hsts@docker"
+    networks:
+      - internal
+      - traefik
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    depends_on:
+      - database
+
+  database:
+    image: mariadb:11.4.5
+    container_name: wordpress-database
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - ${VOLUME_BASE_PATH}/${DB_DATA_PATH}:/var/lib/mysql
+    networks:
+      - internal
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+  traefik:
+    image: traefik:v3.3
+    container_name: traefik
+    restart: unless-stopped
+    command:
+      - "--api.dashboard=${TRAEFIK_DASHBOARD}"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesResolvers.letsencrypt.acme.httpChallenge.entrypoint=web"
+      - "--certificatesResolvers.letsencrypt.acme.email=${LETSENCRYPT_EMAIL}"
+      - "--certificatesResolvers.letsencrypt.acme.storage=/${TRAEFIK_LETSENCRYPT_PATH}/acme.json"
+      - "--log.level=WARN"
+      - "--accesslog=false"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ${VOLUME_BASE_PATH}/${TRAEFIK_LETSENCRYPT_PATH}:/letsencrypt
+    networks:
+      - traefik
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "4"
+
+networks:
+  internal:
+  traefik:
